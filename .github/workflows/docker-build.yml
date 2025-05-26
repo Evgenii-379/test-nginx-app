@@ -43,17 +43,6 @@ jobs:
           docker build -t cr.yandex/${{ secrets.YC_REGISTRY_ID }}/test-nginx-app:${TAG_NAME} .
           docker push cr.yandex/${{ secrets.YC_REGISTRY_ID }}/test-nginx-app:${TAG_NAME}
 
-# Добовляю блок для применения манифестов в кластер: 
-
-      - name: Deploy to Kubernetes (on tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          echo "${{ secrets.KUBECONFIG }}" | base64 -d > kubeconfig.yaml
-          export KUBECONFIG=$(pwd)/kubeconfig.yaml
-          kubectl set image deployment/test-nginx-app test-nginx-app=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/test-nginx-app:${GITHUB_REF#refs/tags/} -n default
-
-# Добавляю код для задания "Установка и настройка CI/CD":
-
   deploy:
     name: Deploy to Kubernetes
     runs-on: ubuntu-latest
@@ -64,8 +53,14 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Set up Kubeconfig
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Set up kubeconfig
         run: |
+          mkdir -p $HOME/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
 
       - name: Set image tag
@@ -74,5 +69,4 @@ jobs:
 
       - name: Update Deployment in Kubernetes
         run: |
-          kubectl set image deployment/test-nginx-app test-nginx-app=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/test-nginx-app:${IMAGE_TAG}
-
+          kubectl set image deployment/test-nginx-app test-nginx-app=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/test-nginx-app:${IMAGE_TAG} -n default
